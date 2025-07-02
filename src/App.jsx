@@ -144,6 +144,41 @@ export default function SprayFoamEstimator() {
     reader.readAsText(file);
   };
 
+  const totalGallons = { open: 0, closed: 0 };
+  let baseMaterialCost = 0;
+
+  sprayAreas.forEach(area => {
+    const { gallons, baseMaterialCost: cost } = calculateMaterialCost(area);
+    if (area.foamType === "Open") totalGallons.open += gallons;
+    else totalGallons.closed += gallons;
+    baseMaterialCost += cost;
+  });
+
+  const fuelCost = globalInputs.travelDistance * globalInputs.travelRate;
+  const baseLaborCost = globalInputs.laborHours * globalInputs.manualLaborRate;
+  const totalBaseCost = baseMaterialCost + baseLaborCost + fuelCost + globalInputs.wasteDisposal + globalInputs.equipmentRental;
+  const materialMarkupAmount = baseMaterialCost * 0.75;
+  const laborMarkupAmount = baseLaborCost * (globalInputs.laborMarkup / 100);
+  const complexityCost = 0;
+  const discount = 0;
+  const customerCost = totalBaseCost + materialMarkupAmount + laborMarkupAmount + complexityCost - discount;
+  const franchiseRoyalty = customerCost * 0.06;
+  const brandFund = customerCost * 0.01;
+  const salesCommission = customerCost * 0.03;
+  const totalFees = franchiseRoyalty + brandFund + salesCommission;
+  const estimatedProfit = customerCost - totalBaseCost - totalFees;
+  const profitMargin = (estimatedProfit / customerCost) * 100;
+
+  const actualMaterialCost = ((actuals.actualOpenGallons + actuals.actualClosedGallons) / 55) * 1870;
+  const actualLaborCost = actuals.actualLaborHours * globalInputs.manualLaborRate;
+  const actualBaseCost = actualMaterialCost + actualLaborCost + fuelCost + globalInputs.wasteDisposal + globalInputs.equipmentRental;
+  const actualCustomerCost = customerCost;
+  const actualFees = actualCustomerCost * 0.10;
+  const actualProfit = actualCustomerCost - actualBaseCost - actualFees;
+  const actualMargin = (actualProfit / actualCustomerCost) * 100;
+  const marginColor = profitMargin < 25 ? "text-red-600" : profitMargin < 30 ? "text-yellow-600" : "text-green-600";
+  const actualMarginColor = actualMargin < 25 ? "text-red-600" : actualMargin < 30 ? "text-yellow-600" : "text-green-600";
+
   return (
     <div className="p-6 space-y-10">
       <div className="flex justify-between items-center">
@@ -197,9 +232,22 @@ export default function SprayFoamEstimator() {
                           onChange={(e) => updateArea(index, key, e.target.value)}
                           className="w-full border p-2 rounded"
                         >
-                          {(key === "foamType" ? ["Open", "Closed"] : ["General Area", "Roof Deck", "Gable"]).map(opt => (
-                            <option key={opt} value={opt}>{opt}</option>
+                          {(key === "foamType"
+                            ? ["Open", "Closed"]
+                            : ["General Area", "Roof Deck", "Gable"]).map(opt => (
+                              <option key={opt} value={opt}>{opt}</option>
                           ))}
+                        </select>
+                      ) : key === "roofPitch" && area.areaType === "Roof Deck" ? (
+                        <select
+                          value={val}
+                          onChange={(e) => updateArea(index, key, e.target.value)}
+                          className="w-full border p-2 rounded"
+                        >
+                          {[...Array(12)].map((_, i) => {
+                            const pitch = `${i + 1}/12`;
+                            return <option key={pitch} value={pitch}>{pitch}</option>;
+                          })}
                         </select>
                       ) : (
                         <input
@@ -219,6 +267,68 @@ export default function SprayFoamEstimator() {
           );
         })}
         <button onClick={addArea} className="bg-blue-500 text-white px-4 py-2 rounded">Add Area</button>
+      </div>
+
+      <div>
+        <h2 className="text-xl font-bold mb-2">Estimate Summary</h2>
+        <div className="text-sm space-y-1">
+          <div>Open Cell Gallons: {totalGallons.open.toFixed(1)}</div>
+          <div>Closed Cell Gallons: {totalGallons.closed.toFixed(1)}</div>
+          <div>Total Material Cost: ${baseMaterialCost.toFixed(2)}</div>
+          <div>Base Labor Cost: ${baseLaborCost.toFixed(2)}</div>
+          <div>Fuel Cost: ${fuelCost.toFixed(2)}</div>
+          <div>Waste Disposal: ${globalInputs.wasteDisposal.toFixed(2)}</div>
+          <div>Equipment Rental: ${globalInputs.equipmentRental.toFixed(2)}</div>
+          <div className="font-bold">Base Job Cost: ${totalBaseCost.toFixed(2)}</div>
+          <div>Material Markup: ${materialMarkupAmount.toFixed(2)}</div>
+          <div>Labor Markup: ${laborMarkupAmount.toFixed(2)}</div>
+          <div className="font-bold">Customer Charge: ${customerCost.toFixed(2)}</div>
+          <div>Franchise Royalty: ${franchiseRoyalty.toFixed(2)}</div>
+          <div>Brand Fund: ${brandFund.toFixed(2)}</div>
+          <div>Sales Commission: ${salesCommission.toFixed(2)}</div>
+          <div className="font-bold">Total Fees: ${totalFees.toFixed(2)}</div>
+          <div className={"font-bold " + marginColor}>Estimated Profit: ${estimatedProfit.toFixed(2)} ({profitMargin.toFixed(1)}%)</div>
+        </div>
+      </div>
+
+      <div>
+        <h2 className="text-xl font-bold mt-6 mb-2">Actual Results</h2>
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium mb-1">Actual Labor Hours</label>
+            <input
+              type="number"
+              value={actuals.actualLaborHours}
+              onChange={(e) => handleActualsChange("actualLaborHours", e.target.value)}
+              className="w-full border p-2 rounded"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">Actual Open Cell Gallons</label>
+            <input
+              type="number"
+              value={actuals.actualOpenGallons}
+              onChange={(e) => handleActualsChange("actualOpenGallons", e.target.value)}
+              className="w-full border p-2 rounded"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">Actual Closed Cell Gallons</label>
+            <input
+              type="number"
+              value={actuals.actualClosedGallons}
+              onChange={(e) => handleActualsChange("actualClosedGallons", e.target.value)}
+              className="w-full border p-2 rounded"
+            />
+          </div>
+        </div>
+        <div className="mt-4 text-sm">
+          <div>Actual Material Cost: ${actualMaterialCost.toFixed(2)}</div>
+          <div>Actual Labor Cost: ${actualLaborCost.toFixed(2)}</div>
+          <div className="font-bold">Actual Base Job Cost: ${actualBaseCost.toFixed(2)}</div>
+          <div>Total Fees: ${actualFees.toFixed(2)}</div>
+          <div className={"font-bold " + actualMarginColor}>Actual Profit: ${actualProfit.toFixed(2)} ({actualMargin.toFixed(1)}%)</div>
+        </div>
       </div>
     </div>
   );
