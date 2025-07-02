@@ -63,18 +63,16 @@ export default function SprayFoamEstimator() {
     equipmentRental: 0
   });
 
-  const [sprayAreas, setSprayAreas] = useState([
-    {
-      length: 0,
-      width: 0,
-      foamType: "Open",
-      foamThickness: 6,
-      materialPrice: 1870,
-      materialMarkup: 80,
-      areaType: "General Area",
-      roofPitch: "4/12"
-    }
-  ]);
+  const [sprayAreas, setSprayAreas] = useState([{
+    length: 0,
+    width: 0,
+    foamType: "Open",
+    foamThickness: 6,
+    materialPrice: 1870,
+    materialMarkup: 80,
+    areaType: "General Area",
+    roofPitch: "4/12"
+  }]);
 
   const [actuals, setActuals] = useState({
     actualLaborHours: 0,
@@ -115,27 +113,54 @@ export default function SprayFoamEstimator() {
   };
 
   const removeArea = (index) => {
-    const updated = sprayAreas.filter((_, i) => i !== index);
-    setSprayAreas(updated);
+    setSprayAreas(sprayAreas.filter((_, i) => i !== index));
+  };
+
+  const saveEstimate = () => {
+    const json = JSON.stringify({ estimateName, globalInputs, sprayAreas, actuals }, null, 2);
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${estimateName || 'spray-foam-estimate'}.json`;
+    a.click();
+  };
+
+  const loadEstimate = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const data = JSON.parse(reader.result);
+        setEstimateName(data.estimateName || "");
+        setGlobalInputs(data.globalInputs || {});
+        setSprayAreas(data.sprayAreas || []);
+        setActuals(data.actuals || {});
+      } catch (err) {
+        alert("Invalid JSON file.");
+      }
+    };
+    reader.readAsText(file);
   };
 
   const totalGallons = { open: 0, closed: 0 };
   let baseMaterialCost = 0;
+  let materialMarkupAmount = 0;
+
   sprayAreas.forEach(area => {
-    const { gallons, baseMaterialCost: cost } = calculateMaterialCost(area);
+    const { gallons, baseMaterialCost: cost, markupAmount } = calculateMaterialCost(area);
     if (area.foamType === "Open") totalGallons.open += gallons;
     else totalGallons.closed += gallons;
     baseMaterialCost += cost;
+    materialMarkupAmount += markupAmount;
   });
 
-  const baseLaborCost = globalInputs.laborHours * globalInputs.manualLaborRate;
   const fuelCost = globalInputs.travelDistance * globalInputs.travelRate;
+  const baseLaborCost = globalInputs.laborHours * globalInputs.manualLaborRate;
   const totalBaseCost = baseMaterialCost + baseLaborCost + fuelCost + globalInputs.wasteDisposal + globalInputs.equipmentRental;
-  const materialMarkupAmount = baseMaterialCost * 0.75;
   const laborMarkupAmount = baseLaborCost * (globalInputs.laborMarkup / 100);
-  const complexityCost = 0;
-  const discount = 0;
-  const customerCost = totalBaseCost + materialMarkupAmount + laborMarkupAmount + complexityCost - discount;
+  const customerCost = totalBaseCost + materialMarkupAmount + laborMarkupAmount;
   const franchiseRoyalty = customerCost * 0.06;
   const brandFund = customerCost * 0.01;
   const salesCommission = customerCost * 0.03;
@@ -153,19 +178,22 @@ export default function SprayFoamEstimator() {
   const marginColor = profitMargin < 25 ? "text-red-600" : profitMargin < 30 ? "text-yellow-600" : "text-green-600";
   const actualMarginColor = actualMargin < 25 ? "text-red-600" : actualMargin < 30 ? "text-yellow-600" : "text-green-600";
 
-  const openSets = totalGallons.open / 55;
-  const closedSets = totalGallons.closed / 55;
+  const pitchOptions = Array.from({ length: 12 }, (_, i) => `${i + 1}/12`);
 
   return (
     <div className="p-6 space-y-10">
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col sm:flex-row gap-4 justify-between items-start">
         <input
           type="text"
           placeholder="Estimate Name"
           value={estimateName}
           onChange={(e) => setEstimateName(e.target.value)}
-          className="border p-2 rounded w-1/2"
+          className="border p-2 rounded w-full sm:w-1/2"
         />
+        <div className="flex gap-2">
+          <button onClick={saveEstimate} className="bg-green-600 text-white px-4 py-2 rounded">Save JSON</button>
+          <input type="file" accept="application/json" onChange={loadEstimate} className="border p-2 rounded" />
+        </div>
       </div>
 
       <div>
@@ -192,8 +220,9 @@ export default function SprayFoamEstimator() {
           return (
             <div key={index} className="border p-4 rounded mb-4">
               <div className="grid grid-cols-2 gap-4">
-                {Object.entries(area).map(([key, val]) => (
-                  key !== "roofPitch" || area.areaType === "Roof Deck" ? (
+                {Object.entries(area).map(([key, val]) => {
+                  if (key === "roofPitch" && area.areaType !== "Roof Deck") return null;
+                  return (
                     <div key={key}>
                       <label className="block text-sm font-medium mb-1">{labelMap[key] || key}</label>
                       {key === "foamType" || key === "areaType" ? (
@@ -202,10 +231,7 @@ export default function SprayFoamEstimator() {
                           onChange={(e) => updateArea(index, key, e.target.value)}
                           className="w-full border p-2 rounded"
                         >
-                          {(key === "foamType"
-                            ? ["Open", "Closed"]
-                            : ["General Area", "Roof Deck", "Gable"]
-                          ).map(opt => (
+                          {(key === "foamType" ? ["Open", "Closed"] : ["General Area", "Roof Deck", "Gable"]).map(opt => (
                             <option key={opt} value={opt}>{opt}</option>
                           ))}
                         </select>
@@ -215,8 +241,8 @@ export default function SprayFoamEstimator() {
                           onChange={(e) => updateArea(index, key, e.target.value)}
                           className="w-full border p-2 rounded"
                         >
-                          {Array.from({ length: 12 }, (_, i) => `${i + 1}/12`).map(pitch => (
-                            <option key={pitch} value={pitch}>{pitch}</option>
+                          {pitchOptions.map(opt => (
+                            <option key={opt} value={opt}>{opt}</option>
                           ))}
                         </select>
                       ) : (
@@ -228,8 +254,8 @@ export default function SprayFoamEstimator() {
                         />
                       )}
                     </div>
-                  ) : null
-                ))}
+                  );
+                })}
               </div>
               <MiniOutput
                 sqft={sqft}
@@ -243,14 +269,14 @@ export default function SprayFoamEstimator() {
             </div>
           );
         })}
-        <button onClick={addArea} className="bg-blue-500 text-white px-4 py-2 rounded">Add Area</button>
+        <button onClick={addArea} className="bg-blue-600 text-white px-4 py-2 rounded">Add Area</button>
       </div>
 
       <div>
         <h2 className="text-xl font-bold mb-2">Estimate Summary</h2>
         <div className="text-sm space-y-1">
-          <div>Open Cell Gallons: {totalGallons.open.toFixed(1)} ({openSets.toFixed(2)} sets)</div>
-          <div>Closed Cell Gallons: {totalGallons.closed.toFixed(1)} ({closedSets.toFixed(2)} sets)</div>
+          <div>Open Cell Gallons: {totalGallons.open.toFixed(1)}</div>
+          <div>Closed Cell Gallons: {totalGallons.closed.toFixed(1)}</div>
           <div>Total Material Cost: ${baseMaterialCost.toFixed(2)}</div>
           <div>Base Labor Cost: ${baseLaborCost.toFixed(2)}</div>
           <div>Fuel Cost: ${fuelCost.toFixed(2)}</div>
