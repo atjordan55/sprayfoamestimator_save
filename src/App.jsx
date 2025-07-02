@@ -146,22 +146,21 @@ export default function SprayFoamEstimator() {
 
   const totalGallons = { open: 0, closed: 0 };
   let baseMaterialCost = 0;
+  let materialMarkupAmount = 0;
 
   sprayAreas.forEach(area => {
-    const { gallons, baseMaterialCost: cost } = calculateMaterialCost(area);
+    const { gallons, baseMaterialCost: cost, markupAmount } = calculateMaterialCost(area);
     if (area.foamType === "Open") totalGallons.open += gallons;
     else totalGallons.closed += gallons;
     baseMaterialCost += cost;
+    materialMarkupAmount += markupAmount;
   });
 
   const fuelCost = globalInputs.travelDistance * globalInputs.travelRate;
   const baseLaborCost = globalInputs.laborHours * globalInputs.manualLaborRate;
   const totalBaseCost = baseMaterialCost + baseLaborCost + fuelCost + globalInputs.wasteDisposal + globalInputs.equipmentRental;
-  const materialMarkupAmount = baseMaterialCost * 0.75;
   const laborMarkupAmount = baseLaborCost * (globalInputs.laborMarkup / 100);
-  const complexityCost = 0;
-  const discount = 0;
-  const customerCost = totalBaseCost + materialMarkupAmount + laborMarkupAmount + complexityCost - discount;
+  const customerCost = totalBaseCost + materialMarkupAmount + laborMarkupAmount;
   const franchiseRoyalty = customerCost * 0.06;
   const brandFund = customerCost * 0.01;
   const salesCommission = customerCost * 0.03;
@@ -179,22 +178,21 @@ export default function SprayFoamEstimator() {
   const marginColor = profitMargin < 25 ? "text-red-600" : profitMargin < 30 ? "text-yellow-600" : "text-green-600";
   const actualMarginColor = actualMargin < 25 ? "text-red-600" : actualMargin < 30 ? "text-yellow-600" : "text-green-600";
 
+  const pitchOptions = Array.from({ length: 12 }, (_, i) => `${i + 1}/12`);
+
   return (
     <div className="p-6 space-y-10">
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col sm:flex-row gap-4 justify-between items-start">
         <input
           type="text"
           placeholder="Estimate Name"
           value={estimateName}
           onChange={(e) => setEstimateName(e.target.value)}
-          className="border p-2 rounded w-1/2"
+          className="border p-2 rounded w-full sm:w-1/2"
         />
-        <div className="flex space-x-2">
-          <button onClick={saveEstimate} className="bg-green-500 text-white px-4 py-2 rounded">Save</button>
-          <label className="bg-gray-500 text-white px-4 py-2 rounded cursor-pointer">
-            Load
-            <input type="file" accept=".json" onChange={loadEstimate} className="hidden" />
-          </label>
+        <div className="flex gap-2">
+          <button onClick={saveEstimate} className="bg-green-600 text-white px-4 py-2 rounded">Save JSON</button>
+          <input type="file" accept="application/json" onChange={loadEstimate} className="border p-2 rounded" />
         </div>
       </div>
 
@@ -222,8 +220,9 @@ export default function SprayFoamEstimator() {
           return (
             <div key={index} className="border p-4 rounded mb-4">
               <div className="grid grid-cols-2 gap-4">
-                {Object.entries(area).map(([key, val]) => (
-                  key !== "roofPitch" || area.areaType === "Roof Deck" ? (
+                {Object.entries(area).map(([key, val]) => {
+                  if (key === "roofPitch" && area.areaType !== "Roof Deck") return null;
+                  return (
                     <div key={key}>
                       <label className="block text-sm font-medium mb-1">{labelMap[key] || key}</label>
                       {key === "foamType" || key === "areaType" ? (
@@ -232,22 +231,19 @@ export default function SprayFoamEstimator() {
                           onChange={(e) => updateArea(index, key, e.target.value)}
                           className="w-full border p-2 rounded"
                         >
-                          {(key === "foamType"
-                            ? ["Open", "Closed"]
-                            : ["General Area", "Roof Deck", "Gable"]).map(opt => (
-                              <option key={opt} value={opt}>{opt}</option>
+                          {(key === "foamType" ? ["Open", "Closed"] : ["General Area", "Roof Deck", "Gable"]).map(opt => (
+                            <option key={opt} value={opt}>{opt}</option>
                           ))}
                         </select>
-                      ) : key === "roofPitch" && area.areaType === "Roof Deck" ? (
+                      ) : key === "roofPitch" ? (
                         <select
                           value={val}
                           onChange={(e) => updateArea(index, key, e.target.value)}
                           className="w-full border p-2 rounded"
                         >
-                          {[...Array(12)].map((_, i) => {
-                            const pitch = `${i + 1}/12`;
-                            return <option key={pitch} value={pitch}>{pitch}</option>;
-                          })}
+                          {pitchOptions.map(opt => (
+                            <option key={opt} value={opt}>{opt}</option>
+                          ))}
                         </select>
                       ) : (
                         <input
@@ -258,15 +254,22 @@ export default function SprayFoamEstimator() {
                         />
                       )}
                     </div>
-                  ) : null
-                ))}
+                  );
+                })}
               </div>
-              <MiniOutput {...calculateMaterialCost(area)} />
+              <MiniOutput
+                sqft={sqft}
+                gallons={gallons}
+                sets={sets}
+                baseMaterialCost={baseMaterialCost}
+                markupAmount={markupAmount}
+                totalCost={totalCost}
+              />
               <button onClick={() => removeArea(index)} className="mt-2 text-red-500">Remove Area</button>
             </div>
           );
         })}
-        <button onClick={addArea} className="bg-blue-500 text-white px-4 py-2 rounded">Add Area</button>
+        <button onClick={addArea} className="bg-blue-600 text-white px-4 py-2 rounded">Add Area</button>
       </div>
 
       <div>
@@ -287,7 +290,7 @@ export default function SprayFoamEstimator() {
           <div>Brand Fund: ${brandFund.toFixed(2)}</div>
           <div>Sales Commission: ${salesCommission.toFixed(2)}</div>
           <div className="font-bold">Total Fees: ${totalFees.toFixed(2)}</div>
-          <div className={"font-bold " + marginColor}>Estimated Profit: ${estimatedProfit.toFixed(2)} ({profitMargin.toFixed(1)}%)</div>
+          <div className={`font-bold ${marginColor}`}>Estimated Profit: ${estimatedProfit.toFixed(2)} ({profitMargin.toFixed(1)}%)</div>
         </div>
       </div>
 
@@ -327,7 +330,7 @@ export default function SprayFoamEstimator() {
           <div>Actual Labor Cost: ${actualLaborCost.toFixed(2)}</div>
           <div className="font-bold">Actual Base Job Cost: ${actualBaseCost.toFixed(2)}</div>
           <div>Total Fees: ${actualFees.toFixed(2)}</div>
-          <div className={"font-bold " + actualMarginColor}>Actual Profit: ${actualProfit.toFixed(2)} ({actualMargin.toFixed(1)}%)</div>
+          <div className={`font-bold ${actualMarginColor}`}>Actual Profit: ${actualProfit.toFixed(2)} ({actualMargin.toFixed(1)}%)</div>
         </div>
       </div>
     </div>
