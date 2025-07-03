@@ -281,8 +281,8 @@ export default function SprayFoamEstimator() {
       <div>
         <h2 className="text-xl font-bold mb-2">Estimate Summary</h2>
         <div className="text-sm space-y-1">
-          <div>Open Cell: {totalGallons.open.toFixed(1)} gal • {totalSets.open.toFixed(2)} sets</div>
-          <div>Closed Cell: {totalGallons.closed.toFixed(1)} gal • {totalSets.closed.toFixed(2)} sets</div>
+          <div>Open Cell: {totalGallons.open?.toFixed(1) || "0.0"} gal • {totalSets.open?.toFixed(2) || "0.00"} sets</div>
+          <div>Closed Cell: {totalGallons.closed?.toFixed(1) || "0.0"} gal • {totalSets.closed?.toFixed(2) || "0.00"} sets</div>
           <div>Total Material Cost: ${baseMaterialCost.toFixed(2)}</div>
           <div>Base Labor Cost: ${baseLaborCost.toFixed(2)}</div>
           <div>Fuel Cost: ${fuelCost.toFixed(2)}</div>
@@ -342,4 +342,3 @@ export default function SprayFoamEstimator() {
     </div>
   );
 }
-
