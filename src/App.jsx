@@ -181,15 +181,17 @@ export default function SprayFoamEstimator() {
   const pitchOptions = Array.from({ length: 12 }, (_, i) => `${i + 1}/12`);
 
   return (
-      <div className="bg-gray-100 p-4 rounded shadow">
-        <h2 className="text-xl font-bold mb-2">Estimate Summary</h2>
-        <div className="text-lg font-semibold">
-          Open Cell: {totalGallons.open?.toFixed(1) || "0.0"} gal • {totalSets.open?.toFixed(2) || "0.00"} sets
+      <>
+        <div className="bg-gray-100 p-4 rounded shadow">
+          <h2 className="text-xl font-bold mb-2">Estimate Summary</h2>
+          <div className="text-lg font-semibold">
+            Open Cell: {totalGallons.open?.toFixed(1) || "0.0"} gal • {totalSets.open?.toFixed(2) || "0.00"} sets
+          </div>
+          <div className="text-lg font-semibold">
+            Closed Cell: {totalGallons.closed?.toFixed(1) || "0.0"} gal • {totalSets.closed?.toFixed(2) || "0.00"} sets
+          </div>
         </div>
-        <div className="text-lg font-semibold">
-          Closed Cell: {totalGallons.closed?.toFixed(1) || "0.0"} gal • {totalSets.closed?.toFixed(2) || "0.00"} sets
-        </div>
-      </div>
+      </>
     <div className="p-6 space-y-10">
       <div className="flex flex-col sm:flex-row gap-4 justify-between items-start">
         <input
@@ -345,4 +347,3 @@ export default function SprayFoamEstimator() {
     </div>
   );
 }
-
